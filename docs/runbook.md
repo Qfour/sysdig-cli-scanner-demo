@@ -100,3 +100,57 @@ IaCスキャンなど別の分析を追加する場合は、必ず別のcategory
 - [ ] 同じcategoryへの再アップロードは、そのcategoryの既存アラート
       セットを正しく更新する(新category作成時のみ、既存アラートが
       "stale"としてclose対象になる挙動を含む)。
+
+## 5. 実施結果(2026-09-28, `Qfour/sysdig-cli-scanner-demo`, リージョンAU1)
+
+このリポジトリ自体で1〜3を実際に実行して確認した結果を記録する。
+
+**リージョン設定の罠**: `SYSDIG_SECURE_URL`未設定(デフォルト
+`https://secure.sysdig.com`, US1)でトークンを投げたところ、
+「Sysdig Secure Token is required」エラーではなく
+`Unable to retrieve MainDB ... Exiting now`という一見無関係な
+エラーで失敗した。原因はトークンのリージョン(AU1)とAPI URLの
+不一致。AU1の正しいエンドポイントは`https://app.au1.sysdig.com`
+(Website URLとAPI Endpointが同一ドメイン)。エラーメッセージから
+リージョン不一致だと直接分かるわけではないので、`Unable to
+retrieve MainDB`が出たら真っ先にリージョン設定を疑うこと。
+
+**手順1(初回スキャン)**: 5件検出(critical×2, high×2)。
+`stop-on-failed-policy-eval: true`によりPolicy Evaluation FAILEDで
+ジョブは失敗扱いになったが、`Verify SARIF was actually generated`
+と`validate_sarif.py`は正常終了し、SARIFは正しくアップロードされた
+(「検出あり」と「SARIF未生成」の分離が実際に機能)。5件それぞれが
+`<pkg名>-<version>-<path>`形式の別ruleIdを持ち、Code Scanning側でも
+5件の別アラートとして表示され、`security-severity`起因の重要度
+バッジも正しく出た。一方`validate_sarif.py`は実データに対しても
+警告を出した: 5/5件で`partialFingerprints`が欠落、全件`level=note`固定
+(いずれも設計時にコード上のIssueから予想していた既知の不具合と一致)。
+
+**手順2(同一イメージ再スキャン)**: 5件のアラート番号・`created_at`が
+変化せず、新規アラートは作られなかった。`partialFingerprints`が
+欠落していても、GitHubの`ruleId`+location基準のフォールバック照合で
+アラート継続性が保たれることを確認した。
+
+**手順3(修正後の再スキャン、重要な注意点)**: `sample-app/Dockerfile`で
+Flask 1.1.2→1.1.4、Jinja2 2.11.2→2.11.3にpipアップグレードして
+再スキャンしたところ、Flask-1.1.2とJinja2-2.11.2のアラートは
+`state: fixed`になった。しかし実際のCVE本文を確認すると、Flask
+1.1.4もJinja2 2.11.3も**同じCVE(CVE-2023-30861等)をまだ含んでいた**
+(真の修正版はFlask 2.2.5+ / Jinja2 3.1.x+で、Python 2.7を維持する
+制約上そこまで上げられない)。つまり実際に起きたのは:
+
+- ruleIdが`pkg名-version-path`でバージョンを含むため、バージョンを
+  上げた時点で**旧バージョンのruleIdのアラートは機械的にfixedになる**
+  (脆弱性が解消されたかどうかとは無関係)。
+- 同じCVEが新バージョンのruleId(`Flask-1.1.4-...`,
+  `Jinja2-2.11.3-...`)で**新規アラートとして再度オープンした**。
+- setuptools(OS側dist-packagesと重複してpipでアンインストールできず
+  未変更)とWerkzeug/click(py2対応の新版が存在せず未変更)のアラートは
+  期待通りopenのまま維持された。
+
+**教訓**: このアラート追跡モデルは「パッケージの正確なバージョン」を
+単位にしている。運用時は「Fixedになった」ことだけを見て「CVEが
+解消された」と判断してはいけない。fixedになったアラートの直後に
+同じCVEが新しいruleIdで再オープンしていないか(=見た目の入れ替えに
+すぎないか)を、diff対象の期間でCode scanning alertsを`state=all`で
+確認するまでがワンセットである。
