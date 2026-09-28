@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "sysdig-cli-scanner",
+          "version": "1.29.0",
+          "rules": [
+            {
+              "id": "CVE-2023-44487",
+              "name": "CVE-2023-44487",
+              "shortDescription": {
+                "text": "CVE-2023-44487 in org.eclipse.jetty.http2:http2-server@9.4.51.v20230217"
+              },
+              "properties": {
+                "security-severity": "7.5"
+              }
+            },
+            {
+              "id": "CVE-2023-44487",
+              "name": "CVE-2023-44487",
+              "shortDescription": {
+                "text": "CVE-2023-44487 in org.eclipse.jetty.http2:http2-common@9.4.51.v20230217"
+              },
+              "properties": {
+                "security-severity": "7.5"
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "CVE-2023-44487",
+          "level": "note",
+          "message": {
+            "text": "CVE-2023-44487 in org.eclipse.jetty.http2:http2-server@9.4.51.v20230217"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "sample-app/Dockerfile"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "CVE-2023-44487",
+          "level": "note",
+          "message": {
+            "text": "CVE-2023-44487 in org.eclipse.jetty.http2:http2-common@9.4.51.v20230217"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "sample-app/Dockerfile"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

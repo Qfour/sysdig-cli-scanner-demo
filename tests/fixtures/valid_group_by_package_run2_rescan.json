@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "sysdig-cli-scanner",
+          "version": "1.29.1",
+          "rules": [
+            {
+              "id": "org.eclipse.jetty.http2:http2-server-9.4.51.v20230217-usr/share/app/lib",
+              "name": "org.eclipse.jetty.http2:http2-server@9.4.51.v20230217",
+              "shortDescription": {
+                "text": "1 vulnerability found in org.eclipse.jetty.http2:http2-server@9.4.51.v20230217"
+              },
+              "fullDescription": {
+                "text": "CVE-2023-44487 affects org.eclipse.jetty.http2:http2-server@9.4.51.v20230217"
+              },
+              "properties": {
+                "security-severity": "7.5"
+              }
+            },
+            {
+              "id": "org.eclipse.jetty.http2:http2-common-9.4.51.v20230217-usr/share/app/lib",
+              "name": "org.eclipse.jetty.http2:http2-common@9.4.51.v20230217",
+              "shortDescription": {
+                "text": "1 vulnerability found in org.eclipse.jetty.http2:http2-common@9.4.51.v20230217"
+              },
+              "fullDescription": {
+                "text": "CVE-2023-44487 affects org.eclipse.jetty.http2:http2-common@9.4.51.v20230217"
+              },
+              "properties": {
+                "security-severity": "7.5"
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "org.eclipse.jetty.http2:http2-server-9.4.51.v20230217-usr/share/app/lib",
+          "level": "warning",
+          "message": {
+            "text": "CVE-2023-44487 in org.eclipse.jetty.http2:http2-server@9.4.51.v20230217"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "sample-app/Dockerfile"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sysdigPackageFingerprint": "http2-server-9.4.51.v20230217-usr/share/app/lib-CVE-2023-44487"
+          }
+        },
+        {
+          "ruleId": "org.eclipse.jetty.http2:http2-common-9.4.51.v20230217-usr/share/app/lib",
+          "level": "warning",
+          "message": {
+            "text": "CVE-2023-44487 in org.eclipse.jetty.http2:http2-common@9.4.51.v20230217"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "sample-app/Dockerfile"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "sysdigPackageFingerprint": "http2-common-9.4.51.v20230217-usr/share/app/lib-CVE-2023-44487"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+name: Test SARIF validator
+
+# SARIFの妥当性・アラート同一性ロジック(scripts/validate_sarif.py)のユニットテスト。
+# Sysdig Secureの認証情報を必要としないため、forkからのPRでも実行できる。
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/**"
+      - "tests/**"
+      - ".github/workflows/test-validator.yml"
+  pull_request:
+    paths:
+      - "scripts/**"
+      - "tests/**"
+      - ".github/workflows/test-validator.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r scripts/requirements.txt pytest
+      - run: python -m pytest tests/ -v

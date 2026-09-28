@@ -1,0 +1,95 @@
+name: Sysdig VM Scan (SARIF)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "sample-app/**"
+      - ".github/workflows/sysdig-scan.yml"
+  workflow_dispatch: {}
+
+# 最小権限。private repoでは upload-sarif が実行中ワークフローの状態確認に
+# actions:read も要求するため付与している(public repoでは不要だが害はない)。
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+env:
+  # スキャン単位(このリポジトリのVMスキャン対象=sample-app)ごとに固定するcategory。
+  # 実行ごとに変わる値(SHAや日時)を混ぜない。IaCスキャンを追加する場合は
+  # 別カテゴリ(例: sysdig-iac-sample-app)を割り、GitHub Code Scanning上で
+  # 分析種別を混同しないようにする。
+  SARIF_CATEGORY: sysdig-vm-sample-app
+  # リージョンは環境に応じてrepository variableで上書きする
+  # (Settings > Secrets and variables > Actions > Variables > SYSDIG_SECURE_URL)。
+  # 例: https://secure.sysdig.com (US1) / https://us2.app.sysdig.com / https://eu1.app.sysdig.com 等。
+  SYSDIG_SECURE_URL: ${{ vars.SYSDIG_SECURE_URL || 'https://secure.sysdig.com' }}
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build sample image
+        run: docker build -t sample-app:ci ./sample-app
+
+      - name: Sysdig CLI Scanner
+        id: scan
+        uses: sysdiglabs/scan-action@v6
+        with:
+          image-tag: sample-app:ci
+          sysdig-secure-token: ${{ secrets.SYSDIG_SECURE_TOKEN }}
+          sysdig-secure-url: ${{ env.SYSDIG_SECURE_URL }}
+          cli-scanner-version: "1.29.0"
+          # 既定値(false)は per-vulnerability モードで、同じCVEが複数パッケージに
+          # 存在する場合にruleIdが重複するバグが未修正のまま残っている
+          # (sysdiglabs/scan-action#113: ruleIds配列に対してin演算子を使い
+          # dedupeガードが機能しない)。group-by-package側の重複ID問題は
+          # 過去に修正済み(#95: ruleId = pkg.name-pkg.version-pkg.path)なので、
+          # パッケージ別の識別子を安定して得るためtrueを明示指定する。
+          group-by-package: true
+          severity-at-least: medium
+          # ポリシー違反はジョブを失敗させる(検出ありを明示)。
+          # ただし後続のSARIF検証/アップロードはif: success() || failure()で
+          # 継続させるため、「検出あり(policy fail)」と「SARIF未生成/破損」を分離できる。
+          stop-on-failed-policy-eval: true
+          stop-on-processing-error: true
+
+      - name: Verify SARIF was actually generated
+        if: success() || failure()
+        run: |
+          set -euo pipefail
+          SARIF_PATH="${{ steps.scan.outputs.sarifReport }}"
+          if [ -z "$SARIF_PATH" ]; then
+            echo "::error::sarifReport output is empty - scanner did not run to completion. Treating as pipeline error, not zero findings."
+            exit 1
+          fi
+          if [ ! -s "$SARIF_PATH" ]; then
+            echo "::error::SARIF file '$SARIF_PATH' is missing or empty. Treating as pipeline error, not zero findings."
+            exit 1
+          fi
+          echo "SARIF_PATH=$SARIF_PATH" >> "$GITHUB_ENV"
+
+      - name: Set up Python
+        if: success() || failure()
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install SARIF validator dependencies
+        if: success() || failure()
+        run: pip install -r scripts/requirements.txt
+
+      - name: Validate SARIF before upload
+        if: success() || failure()
+        run: python scripts/validate_sarif.py "${{ steps.scan.outputs.sarifReport }}"
+
+      - name: Upload SARIF to GitHub Code Scanning
+        if: success() || failure()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ${{ steps.scan.outputs.sarifReport }}
+          category: ${{ env.SARIF_CATEGORY }}

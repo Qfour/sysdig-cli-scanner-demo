@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "sysdig-cli-scanner",
+          "version": "1.29.0",
+          "rules": []
+        }
+      },
+      "results": []
+    }
+  ]
+}
