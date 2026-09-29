@@ -93,3 +93,12 @@ jobs:
         with:
           sarif_file: ${{ steps.scan.outputs.sarifReport }}
           category: ${{ env.SARIF_CATEGORY }}
+
+      - name: TEMP probe scanReport schema
+        if: success() || failure()
+        run: cp "${{ steps.scan.outputs.scanReport }}" scan-report-probe.json
+      - uses: actions/upload-artifact@v4
+        if: success() || failure()
+        with:
+          name: scan-report-probe
+          path: scan-report-probe.json
