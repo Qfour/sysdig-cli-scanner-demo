@@ -25,6 +25,9 @@ env:
   # (Settings > Secrets and variables > Actions > Variables > SYSDIG_SECURE_URL)。
   # 例: https://secure.sysdig.com (US1) / https://us2.app.sysdig.com / https://eu1.app.sysdig.com 等。
   SYSDIG_SECURE_URL: ${{ vars.SYSDIG_SECURE_URL || 'https://secure.sysdig.com' }}
+  # validate_sarif.py/scan_report.pyの--min-severityと、スキャナーのseverity-at-least
+  # を必ず同じ値にする(片方だけ変えるとレポート件数とCode Scanningの件数がずれる)。
+  SEVERITY_AT_LEAST: medium
 
 jobs:
   scan:
@@ -32,6 +35,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Restore vulnerability baseline from previous run
+        uses: actions/cache/restore@v4
+        with:
+          path: .sysdig-baseline/findings.json
+          key: sysdig-baseline-${{ env.SARIF_CATEGORY }}-${{ github.run_id }}
+          restore-keys: |
+            sysdig-baseline-${{ env.SARIF_CATEGORY }}-
 
       - name: Build sample image
         run: docker build -t sample-app:ci ./sample-app
@@ -51,12 +62,15 @@ jobs:
           # 過去に修正済み(#95: ruleId = pkg.name-pkg.version-pkg.path)なので、
           # パッケージ別の識別子を安定して得るためtrueを明示指定する。
           group-by-package: true
-          severity-at-least: medium
+          severity-at-least: ${{ env.SEVERITY_AT_LEAST }}
           # ポリシー違反はジョブを失敗させる(検出ありを明示)。
           # ただし後続のSARIF検証/アップロードはif: success() || failure()で
           # 継続させるため、「検出あり(policy fail)」と「SARIF未生成/破損」を分離できる。
           stop-on-failed-policy-eval: true
           stop-on-processing-error: true
+          # skip-summary未指定(既定false)のため、パッケージ別の重要度テーブルを含む
+          # 標準サマリーがこのステップだけでActionsのSummaryタブに出力される。
+          # 差分(New/Fixed)はこれに加えて後続のGenerate vulnerability reportステップで追記する。
 
       - name: Verify SARIF was actually generated
         if: success() || failure()
@@ -94,11 +108,33 @@ jobs:
           sarif_file: ${{ steps.scan.outputs.sarifReport }}
           category: ${{ env.SARIF_CATEGORY }}
 
-      - name: TEMP probe scanReport schema
+      - name: Generate vulnerability report and diff since last scan
         if: success() || failure()
-        run: cp "${{ steps.scan.outputs.scanReport }}" scan-report-probe.json
-      - uses: actions/upload-artifact@v4
+        run: |
+          python scripts/scan_report.py "${{ steps.scan.outputs.scanReport }}" \
+            --min-severity "${{ env.SEVERITY_AT_LEAST }}" \
+            --baseline .sysdig-baseline/findings.json \
+            --out-dir vulnerability-report \
+            --image "sample-app:ci"
+
+      - name: Upload scan reports as CI artifacts
         if: success() || failure()
+        uses: actions/upload-artifact@v4
         with:
-          name: scan-report-probe
-          path: scan-report-probe.json
+          name: sysdig-scan-reports-${{ github.run_id }}
+          path: |
+            ${{ steps.scan.outputs.sarifReport }}
+            ${{ steps.scan.outputs.scanReport }}
+            vulnerability-report/vulnerability-report.md
+            vulnerability-report/vulnerability-report.json
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Save vulnerability baseline for next run
+        # 次回の差分計算の対象。ポリシー失敗でジョブがfailureでも、今回の検出内容は
+        # 正しい最新状態なので保存する(if: success() || failure())。
+        if: success() || failure()
+        uses: actions/cache/save@v4
+        with:
+          path: .sysdig-baseline/findings.json
+          key: sysdig-baseline-${{ env.SARIF_CATEGORY }}-${{ github.run_id }}

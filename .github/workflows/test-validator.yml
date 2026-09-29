@@ -1,6 +1,7 @@
 name: Test SARIF validator
 
-# SARIFの妥当性・アラート同一性ロジック(scripts/validate_sarif.py)のユニットテスト。
+# SARIFの妥当性・アラート同一性ロジック(scripts/validate_sarif.py)と
+# 脆弱性差分レポートロジック(scripts/scan_report.py)のユニットテスト。
 # Sysdig Secureの認証情報を必要としないため、forkからのPRでも実行できる。
 on:
   push:

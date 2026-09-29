@@ -9,14 +9,16 @@ Scanningに結果を届けるCIのリファレンス実装。「アップロー�
 ```
 sample-app/Dockerfile          既知CVEを含む公式ダミー脆弱アプリ(sysdiglabs/dummy-vuln-app)
 .github/workflows/
-  sysdig-scan.yml              build → scan → SARIF検証 → upload-sarif
-  test-validator.yml           validate_sarif.pyのユニットテスト(secrets不要、PRでも実行可)
+  sysdig-scan.yml              build → scan → SARIF検証 → upload-sarif → 差分レポート
+  test-validator.yml           validate_sarif.py/scan_report.pyのユニットテスト(secrets不要、PRでも実行可)
 scripts/
   validate_sarif.py            アップロード前のハードゲート(スキーマ/重複ruleId/URI/severity/fingerprint)
+  scan_report.py                scanReport(JSON)からCVE単位の差分(New/Fixed)を計算しSummary/artifactに出力
   schemas/sarif-2.1.0-schema.json  ベンダリングしたSARIF 2.1.0スキーマ
 tests/
-  fixtures/                    group-by-package出力を模したSARIFフィクスチャ
+  fixtures/                    group-by-package出力/scanReportを模したフィクスチャ
   test_validate_sarif.py       アラート同一性(同一CVE×複数パッケージ/再スキャン継続性)のテスト
+  test_scan_report.py          New/Fixedの差分計算ロジックのテスト
 docs/runbook.md                初回表示→再スキャン→修正後再スキャンの実データ確認手順
 ```
 
@@ -96,6 +98,41 @@ category自体を分けることを`docs/runbook.md`の4節に明記した。
 ([codeql-action#2117](https://github.com/github/codeql-action/issues/2117))で確認し、
 最小権限セットとして`contents: read` / `security-events: write` / `actions: read`
 の3つのみを付与している。
+
+### Security Reporting(scan summary + 差分管理)
+
+GitHub Actionsの実行画面には2種類のレポートが出る。
+
+1. **`sysdiglabs/scan-action`自身のネイティブSummary**
+   (`skip-summary`は未指定=既定`false`なので有効)。severity別の
+   Vulnerabilities summaryテーブルと、Dockerfileレイヤー単位の
+   パッケージ別脆弱性テーブルがActionsの「Summary」タブに出る。
+2. **`scripts/scan_report.py`が追記する差分セクション**
+   (`## Vulnerability diff since previous scan`)。scanReport
+   (JSON, `steps.scan.outputs.scanReport`)をCVE単位でパースし、
+   前回実行時の検出内容(baseline)と比較して🆕New/✅Fixedを表示する。
+   baselineは`actions/cache`でジョブ間に持ち越す
+   (key: `sysdig-baseline-${SARIF_CATEGORY}-${run_id}`、
+   restore-keysで直前のrunのキャッシュを前方一致で復元する
+   ローリングキャッシュ方式)。
+
+差分の識別キーはSARIFのruleIdスキームと同じ
+`(package名, version, path, CVE)`。理由は上と同じで、同じCVEが
+別バージョン/別パスに現れた場合を "変化なし" と誤認しないため。
+
+**Fixed = CVE解消ではないことに注意**(`docs/runbook.md`5節で実証済み):
+パッケージのバージョンが変わるとruleId/識別キーも変わるため、
+CVEが実際には残っていてもFixed扱いになり、同じCVEが新バージョンの
+findingとして再度Newに出ることがある。`vulnerability-report.md`にも
+この注記を出力している。
+
+**発行される成果物**: `sysdig-scan-reports-<run_id>`という名前で
+以下をartifactとしてアップロードする(既定90日保持)。
+
+- SARIF (`sarifReport`)
+- 生のscanReport JSON(`scanReport`、フィルタ前の全脆弱性を含む)
+- `vulnerability-report.md` / `.json`(CVE単位のNew/Fixed差分+
+  全件テーブル)
 
 ## 未確認・実データ確認が必要な項目
 

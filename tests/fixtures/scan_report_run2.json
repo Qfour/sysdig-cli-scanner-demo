@@ -1,0 +1,36 @@
+{
+  "info": { "scanTime": "2026-09-29T01:00:00Z" },
+  "scanner": { "name": "sysdig-cli-scanner", "version": "1.29.0" },
+  "result": {
+    "packages": {
+      "pkg-flask": {
+        "name": "Flask",
+        "version": "1.1.4",
+        "path": "/usr/local/lib/python2.7/dist-packages/Flask-1.1.4.dist-info/METADATA",
+        "type": "python",
+        "vulnerabilitiesRefs": ["vuln-flask-1", "vuln-flask-2"]
+      },
+      "pkg-werkzeug": {
+        "name": "Werkzeug",
+        "version": "1.0.1",
+        "path": "/usr/local/lib/python2.7/dist-packages/Werkzeug-1.0.1.dist-info/METADATA",
+        "type": "python",
+        "vulnerabilitiesRefs": ["vuln-werkzeug-low", "vuln-werkzeug-high"]
+      },
+      "pkg-jinja2": {
+        "name": "Jinja2",
+        "version": "2.11.3",
+        "path": "/usr/local/lib/python2.7/dist-packages/Jinja2-2.11.3.dist-info/METADATA",
+        "type": "python",
+        "vulnerabilitiesRefs": ["vuln-jinja-new"]
+      }
+    },
+    "vulnerabilities": {
+      "vuln-flask-1": { "name": "CVE-2023-30861", "severity": "high", "cvssScore": {"score": 7.5}, "fixVersion": "2.2.5", "exploitable": false },
+      "vuln-flask-2": { "name": "CVE-2026-27205", "severity": "medium", "cvssScore": {"score": 4.3}, "fixVersion": "3.1.3", "exploitable": false },
+      "vuln-werkzeug-low": { "name": "CVE-2023-23934", "severity": "low", "cvssScore": {"score": 3.5}, "fixVersion": "2.2.3", "exploitable": false },
+      "vuln-werkzeug-high": { "name": "CVE-2022-29361", "severity": "critical", "cvssScore": {"score": 9.8}, "fixVersion": "2.1.1", "exploitable": false },
+      "vuln-jinja-new": { "name": "CVE-2024-56326", "severity": "high", "cvssScore": {"score": 8.1}, "fixVersion": "3.1.5", "exploitable": true }
+    }
+  }
+}
