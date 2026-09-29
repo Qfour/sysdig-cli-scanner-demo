@@ -154,3 +154,28 @@ Flask 1.1.2→1.1.4、Jinja2 2.11.2→2.11.3にpipアップグレードして
 同じCVEが新しいruleIdで再オープンしていないか(=見た目の入れ替えに
 すぎないか)を、diff対象の期間でCode scanning alertsを`state=all`で
 確認するまでがワンセットである。
+
+## 6. Security Reporting(scan summary + 差分)の実施結果(2026-09-29)
+
+`scripts/scan_report.py`とcacheベースのbaseline(`actions/cache`,
+key: `sysdig-baseline-${SARIF_CATEGORY}-${run_id}`,
+restore-keysで前方一致)を追加した後、同一イメージで2回連続実行して
+以下を確認した。
+
+- **1回目(run 36504186816)**: cache restoreがヒットせず(このキーの
+  cacheが存在しない初回)、`vulnerability-report.md`に「No baseline
+  from a previous run was found」と出力され、18件全件が単純列挙
+  された(New/Fixedの差分は出ない)。`sysdig-scan-reports-<run_id>`
+  artifactにSARIF・scanReport(JSON)・レポートMD/JSONが正しく
+  アップロードされた。
+- **2回目(run 36504332402)**: `restore-keys`の前方一致で1回目の
+  cacheが復元され、`🆕 New since last scan (0)` /
+  `✅ Fixed since last scan (0)`と正しく「差分なし」が出力された。
+  Dockerfileもイメージも変更していないため、これは期待通りの結果。
+
+これで「CIのscan summaryのような形でのSecurity Reporting」と
+「vulnerability reportingの発行による差分管理」の両方を、実際の
+GitHub Actions実行で確認済み。手順1〜3で同じイメージを使い回して
+再検証する際は、この差分レポートも一緒に見ることで、Code Scanning
+alertsのfixed/open状態と、CVE単位のNew/Fixed件数が一致しているかを
+突き合わせられる。
